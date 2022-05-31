@@ -1,9 +1,8 @@
 syntax = "proto3";
 
-package anyon.thunderhead.qpu;
+package anyon.public.snowflake;
+
 option go_package = "anyonsys.com/thunderhead/qpu/api_proto";
-
-
 
 message Instruction {
     string symbol = 1;
@@ -24,3 +23,58 @@ message Result {
 	repeated string shot_read_out = 1;
 }
 
+
+message CircuitJobStatus {
+    enum CircuitJobStatusType {
+        UNKNOWN = 0;
+        QUEUED = 1;
+        RUNNING=2;
+        COMPLETED=3;
+        FAILED=4;
+        CANCELED=5;
+    }
+    CircuitJobStatusType type = 1;
+    string message = 2;
+}
+
+
+message SubmitJobRequest {
+    Circuit circuit = 1;
+    uint64 shots_count = 2;
+    string username=3;
+    string password=4;
+}
+
+message SubmitJobReply {
+    string job_uuid = 1;
+    CircuitJobStatus status = 2;
+}
+
+message JobStatusRequest {
+    string job_uuid = 1;
+    string username=2;
+    string password=3;
+}
+
+message JobStatusReply {
+    string job_uuid = 1;
+    CircuitJobStatus status=2;
+}
+
+message JobResultRequest {
+    string job_uuid = 1;
+    string username=2;
+    string password=3;
+}
+
+message JobResultReply {
+    string job_uuid = 1;
+    repeated Result results = 2;
+    CircuitJobStatus status = 3;
+}
+
+service CircuitAPI {
+    rpc submitJob(SubmitJobRequest) returns (SubmitJobReply) {}
+    rpc getJobStatus(JobStatusRequest) returns (JobStatusReply) {}
+    rpc getJobResult(JobResultRequest) returns (JobResultReply) {}
+}
