@@ -55,6 +55,7 @@ export
     plot_histogram,
     submit_circuit,
     get_circuit_status,
+    get_circuit_result,
    
     create_virtual_qpu,
     is_circuit_native_on_qpu,

@@ -3,6 +3,7 @@ using LinearAlgebra: getproperty
 using UUIDs
 using .AnyonClients
 using gRPCClient
+using StatsBase: countmap
 
 
 @enum JobStatus UNKNOWN = 0 QUEUED = 1 RUNNING = 2 SUCCEEDED = 3 FAILED = 4 CANCELED = 5
@@ -29,36 +30,27 @@ end
 
 function submit_circuit(
     circuit::QuantumCircuit;
-    owner::String,
-    token::String,
+    username::String,
+    password::String,
     shots::Int,
     host::String,
-    verbose::Bool = false,
 )
-    client = AnyonClients.CircuitAPIClient(
-        host,
-        verbose = verbose,
-        negotiation = :http2_prior_knowledge,
-    )
-    # client = AnyonClients.CircuitAPIBlockingClient(host)
-    request = create_job_request(circuit, owner = owner, token = token, shots = shots)
-    try
-        reply = submitJob(client, request)
-        job_uuid = getproperty(reply[1], :job_uuid)
-        status = getproperty(reply[1], :status)
-        message = getproperty(status, :message)
-        status_type = getproperty(status, :_type)
-        return job_uuid, IntToJobStatusMap[status_type]
-    catch e
-        println(e)
-        return e
-    end
+    client = AnyonClients.CircuitAPIBlockingClient(host)
+    request = create_job_request(circuit, username = username, password = password, shots = shots)
+
+    reply = Snowflake.AnyonClients.anyon.public.snowflake.submitJob(client, request)
+    job_uuid = getproperty(reply[1], :job_uuid)
+    status = getproperty(reply[1], :status)
+    message = getproperty(status, :message)
+    status_type = getproperty(status, :_type)
+
+    return job_uuid, IntToJobStatusMap[status_type]
 end
 
 function create_job_request(
     circuit::QuantumCircuit;
-    owner::String,
-    token::String,
+    username::String,
+    password::String,
     shots::Int,
 )
     pipeline = []
@@ -89,10 +81,10 @@ function create_job_request(
 
     end
 
-    circuit_api = AnyonClients.anyon.thunderhead.qpu.Circuit(instructions = pipeline)
+    circuit_api = AnyonClients.anyon.public.snowflake.Circuit(instructions = pipeline)
     request = AnyonClients.SubmitJobRequest(
-        owner = owner,
-        token = token,
+        username = username,
+        password = password,
         shots_count = shots,
         circuit = circuit_api,
     )
@@ -102,24 +94,37 @@ end
 
 function get_circuit_status(
     job_uuid::String;
-    owner::String = "",
-    token::String = "",
-    host = "localhost:60051",
+    username::String,
+    password::String,
+    host::String,
 )
-    client = AnyonClients.CircuitAPIClient(host)
-    request =
-        AnyonClients.JobStatusRequest(job_uuid = job_uuid, owner = owner, token = token)
-    try
-        reply = getJobStatus(client, request)
-        job_uuid = getproperty(reply[1], :job_uuid)
-        status_obj = getproperty(reply[1], :status)
-        msg = getproperty(status_obj, :message)
-        status = getproperty(status_obj, :_type)
+    client = AnyonClients.CircuitAPIBlockingClient(host)
+    request = AnyonClients.JobStatusRequest(job_uuid = job_uuid, username = username, password = password)
 
+    reply = Snowflake.AnyonClients.anyon.public.snowflake.getJobStatus(client, request)
+    status_obj = getproperty(reply[1], :status)
+    msg = getproperty(status_obj, :message)
+    status = getproperty(status_obj, :_type)
 
-        return job_uuid, IntToJobStatusMap[status], msg
-    catch e
-        println(e)
-        return e
-    end
+    return IntToJobStatusMap[status], msg
+end
+
+function get_circuit_result(
+    job_uuid::String;
+    username::String,
+    password::String,
+    host::String,
+)
+    client = AnyonClients.CircuitAPIBlockingClient(host)
+    request = AnyonClients.JobResultRequest(job_uuid = job_uuid, username = username, password = password)
+
+    reply = Snowflake.AnyonClients.anyon.public.snowflake.getJobResult(client, request)
+    job_uuid = getproperty(reply[1], :job_uuid)
+    job_results = getproperty(reply[1], :results)[1]
+    job_result = getproperty(job_results, :shot_read_out)
+    status_obj = getproperty(reply[1], :status)
+    msg = getproperty(status_obj, :message)
+    status = getproperty(status_obj, :_type)
+
+    return countmap(map(String, job_result)), IntToJobStatusMap[status], msg
 end
