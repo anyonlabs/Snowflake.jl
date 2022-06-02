@@ -101,6 +101,7 @@ iswap() = Operator(
 
 
 sigma_x(target) = Gate(["X"], "x", x(), target)
+eye(target) = Gate(["I"], "i", eye(), target)
 sigma_y(target) = Gate(["Y"], "y", y(), target)
 sigma_z(target) = Gate(["Z"], "z", sigma_z(), target)
 hadamard(target) = Gate(["H"], "h", hadamard(), target)
